@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <semaphore.h>
+#include <time.h>
+#include <unistd.h>
 
 int num_clients = 0;
 
@@ -36,13 +38,13 @@ char* barbers [13] = {"Jerry Smith", "Nando DK", "Jhowzinho", "Kadinho", "Livinh
 void check_arguments(int argc, char* argv[]);
 
 void up_queue (sem_t *full, sem_t *empty) {
-	sem_wait(&full);
-	sem_post(&empty);
+	sem_wait(full);
+	sem_post(empty);
 }
 
 void down_queue (sem_t *full, sem_t *empty) {
-	sem_wait(&empty);
-	sem_post(&full);
+	sem_wait(empty);
+	sem_post(full);
 }
 
 void shop_is_full(int clientID) {
@@ -51,37 +53,37 @@ void shop_is_full(int clientID) {
 
 void cutting_hair(int barberID) {
 	printf("Barber %s is going to cut the hair.\n", barbers[barberID]);
-	sleep(random() % 3);
+	sleep(rand()%3);
 }
 
 void receiving_payment(int barberID) {
 	printf("Barber %s is receiving the payment.\n", barbers[barberID]);
-	sleep(random() % 3);
+	sleep(rand()%3);
 }
 
 void going_to_waiting_room(int clientID) {
 	printf("The client %d is entering the waiting room.\n", clientID);
-	sleep(random() % 3);
+	sleep(rand()%3);
 }
 
 void going_to_the_sofa(int clientID) {
 	printf("The client %d is seating on the sofa.\n", clientID);
-	sleep(random() % 3);
+	sleep(rand()%3);
 }
 
 void going_to_the_chair(int clientID) {
 	printf("Ah, ah, aah. Client %d, now you gonna seat!.\n", clientID);
-	sleep(random() % 3);
+	sleep(rand()%3);
 }
 
 void got_hair_cut(int clientID) {
-	printf("The client %s is now avonts and is going to pay the bill.\n", clientID);
-	sleep(random() % 3);
+	printf("The client %d is now avonts and is going to pay the bill.\n", clientID);
+	sleep(rand()%3);
 }
 
 void client_is_leaving(int clientID) {
-	printf("The client %s is tranks and is leaving the shop.\n", clientID);
-	sleep(random() % 3);
+	printf("The client %d is tranks and is leaving the shop.\n", clientID);
+	sleep(rand()%3);
 }
 
 void* f_costumer (void *v) {
@@ -152,12 +154,13 @@ void check_arguments(int argc, char* argv[]) {
 // }
 
 int main(int argc, char* argv[]) {
-	check_arguments(argc, argv);
+	/*check_arguments(argc, argv);
 
 	num_chairs = atoi(argv[1]);
 	num_barbers = atoi(argv[2]);
 	num_seats_sofa = atoi(argv[3]);
-	num_total_customers = atoi(argv[4]);
+	num_total_customers = atoi(argv[4]);*/
+    srand( (unsigned)time(NULL) );
 
 	thr_costumers = (pthread_t *)malloc(sizeof(pthread_t) * num_total_customers);
 	thr_barbers = (pthread_t *)malloc(sizeof(pthread_t) * num_barbers);
