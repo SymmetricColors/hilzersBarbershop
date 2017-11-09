@@ -1,7 +1,10 @@
 CC=gcc
-CFLAGS=-W -pthread
+CFLAGS=-Wall -pthread
 
 all: deadlockControl
 
-deadlockControl: deadlockControl.c
-	$(CC) $(CFLAGS) deadlockControl.c -o deadlockControl
+queue.o: queue.h queue.c
+	$(CC) $(CFLAGS) -c queue.c -o queue.o
+
+deadlockControl: queue.o deadlockControl.c
+	$(CC) $(CFLAGS) deadlockControl.c queue.o -o deadlockControl

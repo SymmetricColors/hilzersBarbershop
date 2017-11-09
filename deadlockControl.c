@@ -4,9 +4,11 @@
 #include <semaphore.h>
 #include <time.h>
 #include <unistd.h>
+#include "queue.h"
 
 int num_clients = 0;
 int tranks_clients = 0;
+//int num_payment = 0;
 int num_chairs = 3;
 int num_barbers = 3;
 int num_seats_sofa = 4;
@@ -15,7 +17,12 @@ int num_total_customers = 20;
 pthread_t *thr_costumers;
 pthread_t *thr_barbers;
 
+struct Queue *q_waiting_room, *q_sofa; 
+
 sem_t mutex;
+sem_t queue_wr;
+sem_t queue_s;
+sem_t queue_c;
 sem_t chair;
 sem_t barber;
 sem_t costumer;
@@ -48,48 +55,50 @@ void down_queue (sem_t *full, sem_t *empty) {
 }
 
 void shop_is_full(int clientID) {
-	printf("The shop is full. No more costumers are allowed to enter. Client %d is leaving the store.\n", clientID);
+	printf("C%d: X The shop is full. No more costumers are allowed to enter. Client is leaving the store.\n", clientID);
 }
 
 void cutting_hair(int barberID) {
 	printf("Barber %s is going to cut the hair.\n", barbers[barberID]);
-	sleep(rand()%3);
+	sleep(rand()%6+4);
 }
 
 void receiving_payment(int barberID) {
 	printf("Barber %s is receiving the payment.\n", barbers[barberID]);
-	sleep(rand()%3);
+	sleep(rand()%4);
 }
 
 void going_to_waiting_room(int clientID) {
-	printf("The client %d is entering the waiting room.\n", clientID);
-	sleep(rand()%3);
+	if(isFull(q_sofa)){
+		printf("C%d: 0 The client is entering the waiting room.\n", clientID);
+		sleep(rand()%2);
+	}
+	sleep(1);
 }
 
 void going_to_the_sofa(int clientID) {
-	printf("The client %d is seating on the sofa.\n", clientID);
-	sleep(rand()%3);
+	printf("C%d: 1 The client is seating on the sofa.\n", clientID);
+	sleep(rand()%2);
 }
 
 void going_to_the_chair(int clientID) {
-	printf("Ah, ah, aah. Client %d, now you gonna seat!.\n", clientID);
-	sleep(rand()%3);
+	printf("C%d: 2 Ah, ah, aah. Now you gonna seat!.\n", clientID);
+	sleep(rand()%2);
 }
 
 void got_hair_cut(int clientID) {
-	printf("The client %d is now avonts and is going to pay the bill.\n", clientID);
+	printf("C%d: 3 The client is now avonts and is going to pay the bill.\n", clientID);
 	sleep(rand()%3);
 }
 
 void client_is_leaving(int clientID) {
-	printf("The client %d is tranks and is leaving the shop.\n", clientID);
+	printf("C%d: 4 The client is tranks and is leaving the shop.\n", clientID);
     ++tranks_clients;
 	sleep(rand()%3);
 }
 
 void* f_costumer (void *v) {
 	int clientID = *(int *) v;
-
 	sem_wait(&mutex);
 	if (num_clients >= num_total_customers) {
 		sem_post(&mutex);
@@ -97,18 +106,61 @@ void* f_costumer (void *v) {
 	}
 	++num_clients;
 	sem_post(&mutex);
-	down_queue(&waiting_room_full, &waiting_room_empty);
+
+	/*
+	if(isFull(q_sofa)==0){
+		sem_post(&mutex);
+		//sem_wait(&queue_wr);
+		sem_wait(&sofa_empty);
+		//sem_wait(&queue_wr);
+		going_to_the_sofa(clientID);
+		enqueue(q_sofa,clientID);
+		//down_queue(&sofa_full, &sofa_empty);
+		
+		//sem_post(&queue_wr);
+
+	}else{
+		sem_post(&mutex);
+		*/
+		//printf("AQUI\n");
+	sem_wait(&waiting_room_empty);
+	//sem_wait(&queue_wr);
+	sem_wait(&queue_wr);
+	enqueue(q_waiting_room,clientID);
 	going_to_waiting_room(clientID);
-	down_queue(&sofa_full, &sofa_empty);
+	sem_post(&queue_wr);
+	//down_queue(&waiting_room_full, &waiting_room_empty);
+	
+//	sem_post(&queue_wr);
+	//sem_post(&queue_wr);
+	sem_wait(&sofa_empty);
+	//sem_wait(&queue_wr);
+	sem_wait(&queue_s);
+	clientID = dequeue(q_waiting_room);
+	sem_post(&waiting_room_empty);
+	enqueue(q_sofa,clientID);
+    //down_queue(&sofa_full, &sofa_empty);
 	going_to_the_sofa(clientID);
-	up_queue(&waiting_room_full, &waiting_room_empty);
-	sem_wait(&chair);
+	sem_post(&queue_s);
+	
+		//up_queue(&waiting_room_full, &waiting_room_empty);
+		//sem_post(&queue_wr);
+	//}
+
+
+    sem_wait(&chair);
+    sem_wait(&queue_c);
+	clientID = dequeue(q_sofa);
 	going_to_the_chair(clientID);
-	up_queue(&sofa_full, &sofa_empty);
+	sem_post(&queue_c);
+	sem_post(&sofa_empty);
+	//up_queue(&sofa_full, &sofa_empty);
+    //sem_post(&queue);
 	sem_post(&costumer);
 	sem_wait(&barber);
 	got_hair_cut(clientID);
 	sem_post(&payment);
+	//sem_post(&mutex);
 	sem_wait(&cash_register);
 	sem_wait(&mutex);
 	--num_clients;
@@ -123,10 +175,15 @@ void* f_barber (void *v) {
 		sem_wait(&costumer);
 		sem_post(&barber);
 		cutting_hair(barberID);
+		sem_post(&chair);
+		//sem_wait(&payment);
+		//while(num_payment>0)
 		sem_wait(&payment);
 		receiving_payment(barberID);
 		sem_post(&cash_register);
-		sem_post(&chair);
+
+		
+		
 	}
 }
 
@@ -152,6 +209,10 @@ int main(int argc, char* argv[]) {
     srand( (unsigned)time(NULL) );
 	thr_costumers = (pthread_t *)malloc(sizeof(pthread_t) * num_total_customers);
 	thr_barbers = (pthread_t *)malloc(sizeof(pthread_t) * num_barbers);
+	
+	q_waiting_room = createQueue(num_total_customers-num_seats_sofa);
+	q_sofa = createQueue(num_seats_sofa);
+	//q_payment = createQueue(num_total_customers);
 
 	int client[num_total_customers];
 
@@ -161,7 +222,9 @@ int main(int argc, char* argv[]) {
 	sem_init(&costumer, 0, 0);
 	sem_init(&payment, 0, 0);
 	sem_init(&cash_register, 0, 0);
-
+    sem_init(&queue_wr,0,1);
+    sem_init(&queue_s,0,1);
+    sem_init(&queue_c,0,1);
 	sem_init(&waiting_room_full, 0, 0);
 	sem_init(&waiting_room_empty, 0, num_total_customers - num_seats_sofa);
 	sem_init(&sofa_full, 0, 0);
@@ -171,16 +234,18 @@ int main(int argc, char* argv[]) {
 
     int al = rand()%10;
     int shuffle[num_barbers];
-	for (i = 0; i < num_barbers; i++) {
-        shuffle[i]= al+i;
-		pthread_create(&thr_barbers[i], 0, f_barber, &shuffle[i]);
-	}
+
 
 	for (i = 0; i < num_total_customers; i++) {
 		client[i] = i;
+
 		pthread_create(&thr_costumers[i], 0, f_costumer, &client[i]);
 	}
-   
+
+    for (i = 0; i < num_barbers; i++) {
+        shuffle[i]= al+i;
+		pthread_create(&thr_barbers[i], 0, f_barber, &shuffle[i]);
+	}
     
     while (tranks_clients<num_total_customers)
     {
