@@ -6,7 +6,7 @@
 #include <unistd.h>
 
 int num_clients = 0;
-
+int tranks_clients = 0;
 int num_chairs = 3;
 int num_barbers = 3;
 int num_seats_sofa = 4;
@@ -26,7 +26,7 @@ sem_t cash_register;
 sem_t waiting_room_empty, waiting_room_full, sofa_empty, sofa_full;
 
 char* barbers [13] = {"Jerry Smith", "Nando DK", "Jhowzinho", "Kadinho", "Livinho", "Kevinho", "G15", "Gustta", "Lucas Lucco", "Yuri Martins", "Lan", "WM", "Don Juan"};
-// shuffle(barbers, 13);
+
 
 
 // void print_initial_instances(resource resource);
@@ -83,6 +83,7 @@ void got_hair_cut(int clientID) {
 
 void client_is_leaving(int clientID) {
 	printf("The client %d is tranks and is leaving the shop.\n", clientID);
+    ++tranks_clients;
 	sleep(rand()%3);
 }
 
@@ -94,7 +95,7 @@ void* f_costumer (void *v) {
 		sem_post(&mutex);
 		shop_is_full(clientID);
 	}
-	num_clients += 1;
+	++num_clients;
 	sem_post(&mutex);
 	down_queue(&waiting_room_full, &waiting_room_empty);
 	going_to_waiting_room(clientID);
@@ -110,7 +111,7 @@ void* f_costumer (void *v) {
 	sem_post(&payment);
 	sem_wait(&cash_register);
 	sem_wait(&mutex);
-	num_clients -= 1;
+	--num_clients;
 	sem_post(&mutex);
 	client_is_leaving(clientID);
 }
@@ -140,18 +141,6 @@ void check_arguments(int argc, char* argv[]) {
 	}
 }
 
-// void shuffle(char *array, size_t n) {
-//     if (n > 1) {
-//         size_t i;
-//         for (i = 0; i < n - 1; i++) 
-//         {
-//           size_t j = i + rand() / (RAND_MAX / (n - i) + 1);
-//           char t = array[j];
-//           array[j] = array[i];
-//           array[i] = t;
-//         }
-//     }
-// }
 
 int main(int argc, char* argv[]) {
 	/*check_arguments(argc, argv);
@@ -161,7 +150,6 @@ int main(int argc, char* argv[]) {
 	num_seats_sofa = atoi(argv[3]);
 	num_total_customers = atoi(argv[4]);*/
     srand( (unsigned)time(NULL) );
-
 	thr_costumers = (pthread_t *)malloc(sizeof(pthread_t) * num_total_customers);
 	thr_barbers = (pthread_t *)malloc(sizeof(pthread_t) * num_barbers);
 
@@ -180,16 +168,25 @@ int main(int argc, char* argv[]) {
 	sem_init(&sofa_empty, 0, num_seats_sofa);
 
 	int i = 0;
+
+    int al = rand()%10;
+    int shuffle[num_barbers];
+	for (i = 0; i < num_barbers; i++) {
+        shuffle[i]= al+i;
+		pthread_create(&thr_barbers[i], 0, f_barber, &shuffle[i]);
+	}
+
 	for (i = 0; i < num_total_customers; i++) {
 		client[i] = i;
 		pthread_create(&thr_costumers[i], 0, f_costumer, &client[i]);
 	}
-
-	for (i = 0; i < num_barbers; i++) {
-		pthread_create(&thr_barbers[i], 0, f_barber, &client[i]);
-	}
-
-	sleep (20000);
+   
+    
+    while (tranks_clients<num_total_customers)
+    {
+        sleep (1);
+    }
+	
 
 	free(thr_costumers);
 	free(thr_barbers);
