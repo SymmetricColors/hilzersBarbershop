@@ -178,9 +178,9 @@ void* f_barber (void *v) {
  */
 int check_arguments(int argc, char* argv[]) {
 	if (argc != 5) {
-		printf("Usage: %s <number of chairs> <number of barbers> <number of seats> <maximum nunmber of costumers>\n", argv[0]);
+		printf("Usage: %s <number of chairs> <number of barbers> <number of seats> <maximum nunmber of costumers>\nUsing the default arguments..\n\n", argv[0]);
 
-		exit(0);
+		//exit(0);
 		return 0;
 	}
 	return 1;
